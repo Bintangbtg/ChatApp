@@ -1,0 +1,31 @@
+apply plugin: 'com.google.gms.google-services'
+
+buildscript {
+    repositories {
+        google()  // Pastikan repositori google ada
+        mavenCentral()  // Pastikan repositori mavenCentral ada
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.4.1'  // Versi gradle yang sesuai
+        classpath 'com.google.gms:google-services:4.4.0'  // Pastikan plugin google-services ditambahkan
+    }
+}
+
+allprojects {
+    repositories {
+        google()  // Pastikan repositori google ada
+        mavenCentral()  // Pastikan repositori mavenCentral ada
+    }
+}
+
+rootProject.buildDir = "../build"
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+subprojects {
+    project.evaluationDependsOn(":app")
+}
+
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
+}
