@@ -12,5 +12,5 @@ key.properties
 **/*.keystore
 **/*.jks
 
-src/*.json
+app/*.json
 **/*.json
