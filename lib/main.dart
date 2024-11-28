@@ -14,10 +14,20 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Offline Chat',
+      title: 'Chat App',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
-        scaffoldBackgroundColor: Colors.grey[200],
+        primaryColor: Colors.blueAccent,
+        scaffoldBackgroundColor: Colors.white,
+        textTheme: TextTheme(bodyMedium: TextStyle(color: Colors.black87)),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.grey[200],
+          contentPadding: EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(30),
+            borderSide: BorderSide.none,
+          ),
+        ),
       ),
       home: ChatScreen(),
     );
@@ -33,33 +43,41 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final CollectionReference _messages =
       FirebaseFirestore.instance.collection('messages');
-  bool isOnline = true; // Status online/offline
+  bool isTyping = false; // Untuk memantau status typing
+  String username = 'Anonymous'; // Nama pengguna default
 
   // Fungsi untuk mengirim pesan
   Future<void> _sendMessage(String message) async {
     if (message.trim().isEmpty) return;
-
+    _controller.clear();
     await _messages.add({
       'message': message,
-      'sender': 'Anonymous', // Nama pengirim (bisa diganti dengan autentikasi)
+      'sender': username,
       'timestamp': FieldValue.serverTimestamp(),
     });
-
-    _controller.clear();
   }
 
   @override
   void initState() {
     super.initState();
-    _checkConnection(); // Cek koneksi internet
   }
 
-  Future<void> _checkConnection() async {
-    // Simulasi status online/offline
-    Timer.periodic(Duration(seconds: 5), (timer) {
+  // Fungsi untuk memantau status mengetik
+  void _onTyping() {
+    setState(() {
+      isTyping = true;
+    });
+    Future.delayed(Duration(seconds: 2), () {
       setState(() {
-        isOnline = !isOnline; // Ganti status secara periodik (contoh simulasi)
+        isTyping = false;
       });
+    });
+  }
+
+  // Fungsi untuk mengubah nama
+  void _changeUsername(String newUsername) {
+    setState(() {
+      username = newUsername;
     });
   }
 
@@ -67,25 +85,51 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: isOnline ? Colors.green : Colors.red,
-              radius: 6,
-            ),
-            SizedBox(width: 8),
-            Text("Offline Chat"),
-          ],
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        title: Text(
+          "Hola $username",
+          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
         ),
-        backgroundColor: Colors.blueAccent,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.settings, color: Colors.black87),
+            onPressed: () {
+              // Implementasikan pengaturan (contoh: ganti nama)
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text("Change Username"),
+                  content: TextField(
+                    onChanged: (value) {
+                      setState(() {
+                        username = value;
+                      });
+                    },
+                    decoration: InputDecoration(hintText: "Enter username"),
+                  ),
+                  actions: [
+                    TextButton(
+                      child: Text("Cancel"),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    TextButton(
+                      child: Text("Save"),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: _messages
-                  .orderBy('timestamp', descending: true)
-                  .snapshots(), // Ambil data terbaru
+              stream:
+                  _messages.orderBy('timestamp', descending: true).snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return Center(child: CircularProgressIndicator());
@@ -99,33 +143,79 @@ class _ChatScreenState extends State<ChatScreen> {
                   itemCount: snapshot.data!.docs.length,
                   itemBuilder: (context, index) {
                     var doc = snapshot.data!.docs[index];
+                    bool isCurrentUser = doc['sender'] == username;
+
                     return Padding(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                      child: Card(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 2,
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            child: Icon(Icons.person, color: Colors.white),
-                            backgroundColor: Colors.blueAccent,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16.0, vertical: 8.0),
+                      child: Align(
+                        alignment: isCurrentUser
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                              vertical: 12, horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: isCurrentUser
+                                ? Colors.blueAccent.withOpacity(0.1)
+                                : Colors.grey[100],
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 6,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
                           ),
-                          title: Text(
-                            doc['message'],
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(doc['sender']),
-                          trailing: Text(
-                            doc['timestamp'] != null
-                                ? (doc['timestamp'] as Timestamp)
-                                    .toDate()
-                                    .toLocal()
-                                    .toString()
-                                    .substring(0, 16)
-                                : "Now",
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: Colors.grey[300],
+                                    child: Text(
+                                      doc['sender'][0].toUpperCase(),
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white),
+                                    ),
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    doc['sender'],
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 16,
+                                        color: Colors.black87),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                doc['message'],
+                                style: TextStyle(fontSize: 16),
+                              ),
+                              SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    doc['timestamp'] != null
+                                        ? (doc['timestamp'] as Timestamp)
+                                            .toDate()
+                                            .toLocal()
+                                            .toString()
+                                            .substring(11, 16)
+                                        : "Waiting",
+                                    style: TextStyle(
+                                        fontSize: 12, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -136,23 +226,29 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(16.0),
             child: Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _controller,
+                    onChanged: (text) {
+                      if (text.isNotEmpty) {
+                        _onTyping();
+                      }
+                    },
                     decoration: InputDecoration(
-                      labelText: "Enter your message",
+                      hintText: "Type a message...",
+                      contentPadding:
+                          EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(30),
+                        borderSide: BorderSide.none,
                       ),
-                      filled: true,
-                      fillColor: Colors.white,
                     ),
                   ),
                 ),
-                SizedBox(width: 8),
+                SizedBox(width: 12),
                 GestureDetector(
                   onTap: () => _sendMessage(_controller.text),
                   child: Container(
